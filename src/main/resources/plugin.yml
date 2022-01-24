@@ -1,0 +1,17 @@
+name: stucoplugin
+main: stucoplugin.Main
+version: 1.18.1.0
+api-version: 1.18
+commands:
+  hw:
+    description: Stuco HW submission system
+    permission: stuco.player
+  hwadmin:
+    description: Stuco HW grading system
+    permission: stuco.admin
+permissions:
+  stuco.player:
+    default: true
+  stuco.admin:
+    default: op
+

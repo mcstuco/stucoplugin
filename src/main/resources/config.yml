@@ -1,0 +1,3 @@
+dbpath: "test.db"
+maxfails: 5
+term: s22
