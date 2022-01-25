@@ -13,6 +13,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 public class Main extends JavaPlugin {
 
   DBConnect db;
+  StucoTabCompleter tabCompleter;
   int numfails = 3;
   String term;
 
@@ -31,6 +32,11 @@ public class Main extends JavaPlugin {
       this.getLogger().severe("Failed to connect to database! System will be disabled.");
       this.numfails = 0;
     }
+
+    // Load tab completer
+    tabCompleter = new StucoTabCompleter(this);
+    this.getCommand("hw").setTabCompleter(this.tabCompleter);
+    //this.getCommand("hwadmin").setTabCompleter(this.tabCompleter);
   }
 
   @Override
@@ -138,18 +144,19 @@ public class Main extends JavaPlugin {
   }
 
   private void hwList(Player p, String[] args) throws SQLException {
-    /*
-    if (args.length == 3 && args[1].equals("secret")) {
-      DBConnect.Query q;
-      q = db.queryDB("select details from intro2mc_submission where student_id = ?;", args[2]);
-      if (q.next()) {
-        try {
-          YamlConfiguration temp = new YamlConfiguration();
-          temp.loadFromString(q.getString("details"));
-          p.teleport(temp.getLocation("location"));
-        } catch (org.bukkit.configuration.InvalidConfigurationException e) {}
-      }
-    }*/
+    DBConnect.Query q;
+    q = db.queryDB("SELECT name, description FROM intro2mc_assignment " +
+                   "WHERE term = ? AND userSubmittable = true ORDER BY created_at ASC;", term);
+    StringBuilder sb = new StringBuilder();
+    sb.append("--------List of currently submittable homework for ").append(term).append(" --------");
+    while (q.next()) {
+      sb.append(q.getString("name")).append(": ");
+      sb.append(q.getString("description")).append('\n');
+    }
+    q.close();
+    p.sendMessage(sb.toString());
   }
+
+
 
 }
