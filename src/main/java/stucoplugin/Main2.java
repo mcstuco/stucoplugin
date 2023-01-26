@@ -18,13 +18,26 @@ import net.md_5.bungee.api.ChatColor;
 
 public class Main extends JavaPlugin {
 
+  DBConnect db;
   StucoTabCompleter tabCompleter;
+  int numfails = 3;
+  String term;
 
   @Override
   public void onEnable() {
     // Load configuration
     saveDefaultConfig();
+    numfails = getConfig().getInt("maxfails");
     String path = getConfig().getString("dbpath");
+    term = getConfig().getString("term");
+
+    // Connect to database
+    try {
+      db = new DBConnect(path);
+    } catch (Exception e) {
+      this.getLogger().severe("Failed to connect to database! System will be disabled.");
+      this.numfails = 0;
+    }
 
     // Load tab completer
     tabCompleter = new StucoTabCompleter(this);
