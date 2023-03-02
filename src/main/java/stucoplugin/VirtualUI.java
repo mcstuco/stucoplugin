@@ -91,13 +91,26 @@ public class VirtualUI {
     this.ui = ui;
   }
 
-  public void correctLore(ItemStack itemStack) {
+  private void fixColor(ItemStack itemStack) {
     ItemMeta meta = itemStack.getItemMeta();
+
+    String name = "&r" + meta.getDisplayName();
+    meta.setDisplayName(ChatColor.translateAlternateColorCodes('&', name));
+
     List<String> lore = meta.getLore();
     if (lore != null) {
       List<String> newLore = new ArrayList<String>();
       for (String line : lore) {
-        line = "&f" + line;
+        if (line.contains(": ")) {
+          String[] split = line.split(": ", 1);
+          if (split.length == 2) {
+            line = "&l&7" + split[0] + ": &r&7" + split[1];
+          } else {
+            line = "&r&7" + line;
+          }
+        } else {
+          line = "&r&7" + line;
+        }
         line = ChatColor.translateAlternateColorCodes('&', line);
         newLore.add(line);
       }
@@ -120,7 +133,7 @@ public class VirtualUI {
     meta.setDisplayName(name);
 
     // process item's lore to have normal white front
-    correctLore(item);
+    fixColor(item);
 
     if (slot < ui.size()) {
       ui.set(slot, item);
@@ -135,14 +148,14 @@ public class VirtualUI {
     }
   }
 
-  public void addLineBreak(int howManyLineBreaks) {
+  public void addLineBreak(int howManyLineBreaks, Material mat) {
     while (ui.size() % 9 != 0) {
-      ui.add(new ItemStack(Material.AIR));
+      ui.add(new ItemStack(mat));
       callbacks.add(null);
     }
     for (int i = 0; i < howManyLineBreaks; i++) {
       for (int j = 0; j < 9; j++) {
-        ui.add(new ItemStack(Material.AIR));
+        ui.add(new ItemStack(mat));
         callbacks.add(null);
       }
     }
@@ -195,7 +208,7 @@ public class VirtualUI {
   //   }
   // }
 
-  public Inventory getUI(int page) {
+  private Inventory getUI(int page) {
     Inventory inventory = Bukkit.createInventory(null, this.maxInventorySize, this.name);
     int pageSize = this.maxInventorySize - 9;
     for (int i = 0; i < pageSize; i++) {
@@ -212,11 +225,11 @@ public class VirtualUI {
         // first slot is for previous page
         if (page > 0) {
           ItemStack item = getItemStack(Material.ARROW, PREVIOUS_PAGE_NAME, null, false);
-          correctLore(item);
+          fixColor(item);
           inventory.setItem(i, item);
         } else {
           ItemStack item = getItemStack(Material.RED_STAINED_GLASS_PANE, PREVIOUS_PAGE_NAME, null, false);
-          correctLore(item);
+          fixColor(item);
           inventory.setItem(i, item);
         }
       } else if (i == pageSize + 1) {
@@ -226,23 +239,23 @@ public class VirtualUI {
         lore.add("Current UUID: " + this.uuid.toString());
         lore.add("Total Page: " + (ui.size() / pageSize + 1));
         ItemStack item = getItemStack(Material.COMMAND_BLOCK, CURRENT_PAGE_NAME, lore, false);
-        correctLore(item);
+        fixColor(item);
         inventory.setItem(i, item);
       } else if (i == pageSize + 2) {
         // third slot is for next page
         if (page < ui.size() / pageSize) {
           ItemStack item = getItemStack(Material.ARROW, NEXT_PAGE_NAME, null, false);
-          correctLore(item);
+          fixColor(item);
           inventory.setItem(i, item);
         } else {
           ItemStack item = getItemStack(Material.RED_STAINED_GLASS_PANE, NEXT_PAGE_NAME, null, false);
-          correctLore(item);
+          fixColor(item);
           inventory.setItem(i, item);
         }
       } else if (i == pageSize + 8) {
         // last slot is for close
         ItemStack item = getItemStack(Material.BARRIER, CLOSE_NAME, null, true);
-        correctLore(item);
+        fixColor(item);
         inventory.setItem(i, item);
       } else {
         // other slots are empty

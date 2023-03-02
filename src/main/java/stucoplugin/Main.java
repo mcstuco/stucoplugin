@@ -26,10 +26,10 @@ import net.md_5.bungee.api.chat.ComponentBuilder;
 
 public class Main extends JavaPlugin {
 
-  DBConnect db;
+  public static DBConnect db;
   StucoTabCompleter tabCompleter;
   int numfails = 3;
-  String term;
+  public static String term;
 
   @Override
   public void onEnable() {
@@ -99,7 +99,7 @@ public class Main extends JavaPlugin {
       } else if (cmd.getName().equalsIgnoreCase("hwadmin")) {
         // base command usage hint
         if (args.length == 0) {
-          sender.sendMessage("Usage: /hwadmin [grade/show/tp/advancement]");
+          sender.sendMessage("Usage: /hwadmin [grade/show/tp/advancement/list]");
           return true;
         }
 
@@ -112,8 +112,10 @@ public class Main extends JavaPlugin {
           hwadminTp((Player) sender, args);
         } else if (args[0].equalsIgnoreCase("advancement")) {
           hwAdvancement((Player) sender, args);
+        } else if (args[0].equalsIgnoreCase("list")) {
+          hwadminList((Player) sender, args);
         } else {
-          sender.sendMessage("Usage: /hwadmin [grade/show/tp/advancement]");
+          sender.sendMessage("Usage: /hwadmin [grade/show/tp/advancement/list]");
         }
       }
 
@@ -197,6 +199,33 @@ public class Main extends JavaPlugin {
     }
     q.close();
     p.sendMessage(sb.toString());
+
+    VirtualUI ui = StudentUI.getHWUI(p, p);
+    ui.showToPlayer(p);
+  }
+
+  private void hwadminList(Player p, String[] args) throws SQLException {
+    // check args length
+    if (args.length != 2) {
+      p.sendMessage("Usage: /hwadmin list [andrewID]");
+      return;
+    }
+
+    // Check if student in system
+    String andrewID = args[1];
+    DBConnect.Query q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE andrewID = ?;", andrewID);
+    if (!q.next()) {
+      p.sendMessage("Student " + andrewID + " does not exist.");
+      q.close();
+      return;
+    }
+    String uuid = q.getString("uuid");
+    q.close();
+
+    UUID playerUUID = UUID.fromString(uuid);
+    OfflinePlayer player = Bukkit.getOfflinePlayer(playerUUID);
+    VirtualUI ui = StudentUI.getHWUI(p, player);
+    ui.showToPlayer(p);
   }
 
   // final command is /hwadmin grade [id] [studentid] [grade]
@@ -362,7 +391,7 @@ public class Main extends JavaPlugin {
       }
     }
     q.close();
-    ui.addLineBreak(2);
+    ui.addLineBreak(1, Material.BLACK_STAINED_GLASS_PANE);
     ui.addItemStack(-1, Material.GREEN_WOOL, "Confirm",
         Arrays.asList("update " + adv.toString() + " to HW" + args[1]), true,
         (VirtualUI callbackUI, Player player, ItemStack item, int slot, int index) -> {
