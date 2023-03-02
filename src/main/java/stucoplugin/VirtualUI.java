@@ -1,5 +1,7 @@
 package stucoplugin;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -15,6 +18,8 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
 
 @FunctionalInterface
 interface VirtualUICallback {
@@ -86,6 +91,21 @@ public class VirtualUI {
     this.ui = ui;
   }
 
+  public void correctLore(ItemStack itemStack) {
+    ItemMeta meta = itemStack.getItemMeta();
+    List<String> lore = meta.getLore();
+    if (lore != null) {
+      List<String> newLore = new ArrayList<String>();
+      for (String line : lore) {
+        line = "&f" + line;
+        line = ChatColor.translateAlternateColorCodes('&', line);
+        newLore.add(line);
+      }
+      meta.setLore(newLore);
+      itemStack.setItemMeta(meta);
+    }
+  }
+
   public void addItemStack(int slot, ItemStack item, VirtualUICallback callback) {
     if (slot < 0) {
       // that means we assign slots automatically
@@ -100,17 +120,7 @@ public class VirtualUI {
     meta.setDisplayName(name);
 
     // process item's lore to have normal white front
-    List<String> lore = meta.getLore();
-    if (lore != null) {
-      List<String> newLore = new ArrayList<String>();
-      for (String line : lore) {
-        line = "&f" + line;
-        line = ChatColor.translateAlternateColorCodes('&', line);
-        newLore.add(line);
-      }
-      meta.setLore(newLore);
-      item.setItemMeta(meta);
-    }
+    correctLore(item);
 
     if (slot < ui.size()) {
       ui.set(slot, item);
@@ -167,6 +177,24 @@ public class VirtualUI {
     addItemStack(slot, item, callback);
   }
 
+  // public void setPlayerHead(ItemStack item, String textureURL) {
+  //   try {
+  //     SkullMeta meta = (SkullMeta) item.getItemMeta();
+  //     OfflinePlayer owner = Bukkit.getOfflinePlayer(UUID.fromString("2551d748-22c7-439e-ac63-1b41911d3953"));
+  //     meta.setOwningPlayer(owner);
+  //     PlayerProfile playerProfile = Bukkit.createPlayerProfile(owner.getUniqueId(), owner.getName());
+
+  //     meta.setOwnerProfile(playerProfile);
+  //     PlayerTextures textures = meta.getOwnerProfile().getTextures();
+  //     URL url = new URL("http://textures.minecraft.net/texture/" + textureURL);
+  //     textures.setSkin(url);
+  //     meta.getOwnerProfile().setTextures(textures);
+  //     item.setItemMeta(meta);
+  //   } catch (MalformedURLException e) {
+  //     e.printStackTrace();
+  //   }
+  // }
+
   public Inventory getUI(int page) {
     Inventory inventory = Bukkit.createInventory(null, this.maxInventorySize, this.name);
     int pageSize = this.maxInventorySize - 9;
@@ -183,9 +211,13 @@ public class VirtualUI {
       if (i == pageSize) {
         // first slot is for previous page
         if (page > 0) {
-          inventory.setItem(i, getItemStack(Material.ARROW, PREVIOUS_PAGE_NAME, null, true));
+          ItemStack item = getItemStack(Material.ARROW, PREVIOUS_PAGE_NAME, null, false);
+          correctLore(item);
+          inventory.setItem(i, item);
         } else {
-          inventory.setItem(i, getItemStack(Material.BARRIER, PREVIOUS_PAGE_NAME, null, false));
+          ItemStack item = getItemStack(Material.RED_STAINED_GLASS_PANE, PREVIOUS_PAGE_NAME, null, false);
+          correctLore(item);
+          inventory.setItem(i, item);
         }
       } else if (i == pageSize + 1) {
         // second slot is for current page
@@ -193,17 +225,25 @@ public class VirtualUI {
         lore.add("Current Page: " + (page + 1));
         lore.add("Current UUID: " + this.uuid.toString());
         lore.add("Total Page: " + (ui.size() / pageSize + 1));
-        inventory.setItem(i, getItemStack(Material.PAPER, CURRENT_PAGE_NAME, lore, false));
+        ItemStack item = getItemStack(Material.COMMAND_BLOCK, CURRENT_PAGE_NAME, lore, false);
+        correctLore(item);
+        inventory.setItem(i, item);
       } else if (i == pageSize + 2) {
         // third slot is for next page
         if (page < ui.size() / pageSize) {
-          inventory.setItem(i, getItemStack(Material.ARROW, NEXT_PAGE_NAME, null, true));
+          ItemStack item = getItemStack(Material.ARROW, NEXT_PAGE_NAME, null, false);
+          correctLore(item);
+          inventory.setItem(i, item);
         } else {
-          inventory.setItem(i, getItemStack(Material.BARRIER, NEXT_PAGE_NAME, null, false));
+          ItemStack item = getItemStack(Material.RED_STAINED_GLASS_PANE, NEXT_PAGE_NAME, null, false);
+          correctLore(item);
+          inventory.setItem(i, item);
         }
       } else if (i == pageSize + 8) {
         // last slot is for close
-        inventory.setItem(i, getItemStack(Material.BARRIER, CLOSE_NAME, null, false));
+        ItemStack item = getItemStack(Material.BARRIER, CLOSE_NAME, null, true);
+        correctLore(item);
+        inventory.setItem(i, item);
       } else {
         // other slots are empty
         inventory.setItem(i, new ItemStack(Material.AIR));

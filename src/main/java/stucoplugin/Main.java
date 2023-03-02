@@ -156,11 +156,11 @@ public class Main extends JavaPlugin {
       q.close();
       return;
     }
-    int assignmentID = q.getInt("id");
+    int assignmentIndex = q.getInt("id");
     q.close();
 
     // Check current submission
-    q = db.queryDB("SELECT id FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;", assignmentID,
+    q = db.queryDB("SELECT id FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;", assignmentIndex,
         andrewID);
     boolean exists = q.next();
     q.close();
@@ -174,13 +174,13 @@ public class Main extends JavaPlugin {
     if (exists) {
       db.updateDB("UPDATE intro2mc_submission SET updated_at = ?, details = ? " +
           "WHERE assignment_id = ? AND student_id = ?;",
-          currentTime, loc, assignmentID, andrewID);
+          currentTime, loc, assignmentIndex, andrewID);
       p.sendMessage("Submission for assignment " + hwid + " successfully updated!");
     } else {
       db.updateDB("INSERT INTO intro2mc_submission " +
           "(created_at, updated_at, assignment_id, student_id, details, grade) " +
           "VALUES (?, ?, ?, ?, ?, \"U\");",
-          currentTime, currentTime, assignmentID, andrewID, loc);
+          currentTime, currentTime, assignmentIndex, andrewID, loc);
       p.sendMessage("Successfully submitted " + hwid + " at your current location!");
     }
   }
@@ -221,14 +221,14 @@ public class Main extends JavaPlugin {
         q.close();
         return;
       }
-      int assignmentID = q.getInt("id");
+      int assignmentIndex = q.getInt("id");
       q.close();
 
       // list all submissions
       ComponentBuilder cb = new ComponentBuilder("--------Submissions for " + hwid + "--------");
       q = db.queryDB(
           "SELECT student_id, details, grade FROM intro2mc_submission WHERE assignment_id = ? ORDER BY grade ASC;",
-          assignmentID);
+          assignmentIndex);
       while (q.next()) {
         String studentID = q.getString("student_id");
         String details = q.getString("details");
@@ -283,13 +283,13 @@ public class Main extends JavaPlugin {
         q.close();
         return;
       }
-      int assignmentID = q.getInt("id");
+      int assignmentIndex = q.getInt("id");
       q.close();
 
       // try update
       int rowschanged = db.updateDB("UPDATE intro2mc_submission SET grade = ? " +
           "WHERE assignment_id = ? AND student_id = ?;",
-          gradeChar, assignmentID, args[2]);
+          gradeChar, assignmentIndex, args[2]);
       if (rowschanged == 0) {
         p.sendMessage("Student didn't submit this assignment!");
       } else {
@@ -316,11 +316,11 @@ public class Main extends JavaPlugin {
       q.close();
       return;
     }
-    int assignmentID = q.getInt("id");
+    int assignmentIndex = q.getInt("id");
     q.close();
 
     // List all student andrewID(varchar(200)) and uuid(varchar(200))
-    VirtualUI ui = new VirtualUI("Advancement HW" + String.valueOf(assignmentID), 54);
+    VirtualUI ui = new VirtualUI("Advancement for " + args[1], 54);
     q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
     ArrayList<String> andrewIDs = new ArrayList<String>();
     ArrayList<Boolean> completeds = new ArrayList<Boolean>();
@@ -364,52 +364,33 @@ public class Main extends JavaPlugin {
     q.close();
     ui.addLineBreak(2);
     ui.addItemStack(-1, Material.GREEN_WOOL, "Confirm",
-        Arrays.asList("update " + adv.toString() + " to HW" + String.valueOf(assignmentID)), true,
+        Arrays.asList("update " + adv.toString() + " to HW" + args[1]), true,
         (VirtualUI callbackUI, Player player, ItemStack item, int slot, int index) -> {
           int totalRowsChanged = 0;
           long currentTime = System.currentTimeMillis();
+          ArrayList<String> completedAndrewIDs = new ArrayList<String>();
+          ArrayList<String> notCompletedAndrewIDs = new ArrayList<String>();
           for (int i = 0; i < andrewIDs.size(); i++) {
             String andrewID = andrewIDs.get(i);
             Boolean completed = completeds.get(i);
             if (completed) {
               try {
-                db.updateDB("UPDATE intro2mc_submission SET updated_at = ?, details = ? " +
-                    "WHERE assignment_id = ? AND student_id = ?;",
-                    currentTime,
-                    "automatically submitted by player " + player.getDisplayName() + "(" + player.getUniqueId() + ")",
-                    assignmentID, andrewID);
-                int rowschanged = db.updateDB("UPDATE intro2mc_submission SET grade = ? " +
-                    "WHERE assignment_id = ? AND student_id = ?;",
-                    "P", assignmentID, args[2]);
-                if (rowschanged == 0) {
-                  p.sendMessage("Student didn't submit this assignment! (This is internal plugin error.)");
-                }
+                int rowschanged = db.updateDB("INSERT INTO intro2mc_submission " +
+                    "(created_at, updated_at, assignment_id, student_id, details, grade) " +
+                    "VALUES (?, ?, ?, ?, ?, \"P\");",
+                    currentTime, currentTime, assignmentIndex, andrewID, "automatically submitted by player " + player.getDisplayName() + " (" + player.getUniqueId() + ")");
+                totalRowsChanged += rowschanged;
+                completedAndrewIDs.add(andrewID);
               } catch (Exception e) {
-                p.sendMessage("Error updating grade for " + andrewID);
+                p.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
               }
             } else {
-              try {
-                db.updateDB("UPDATE intro2mc_submission SET updated_at = ?, details = ? " +
-                    "WHERE assignment_id = ? AND student_id = ?;",
-                    currentTime,
-                    "automatically submitted by player " + player.getDisplayName() + "(" + player.getUniqueId() + ")",
-                    assignmentID, andrewID);
-                int rowschanged = db.updateDB("UPDATE intro2mc_submission SET grade = ? " +
-                    "WHERE assignment_id = ? AND student_id = ?;",
-                    "U", assignmentID, args[2]);
-                if (rowschanged == 0) {
-                  p.sendMessage("Student didn't submit this assignment! (This is internal plugin error.)");
-                }
-              } catch (Exception e) {
-                p.sendMessage("Error updating grade for " + andrewID);
-              }
+              notCompletedAndrewIDs.add(andrewID);
             }
           }
-          if (totalRowsChanged == 0) {
-            p.sendMessage("No student completed this advancement! (This is internal plugin error.)");
-          } else {
-            p.sendMessage("Grade successfully updated for " + String.valueOf(totalRowsChanged) + " students.");
-          }
+          p.sendMessage("Grade successfully updated for " + String.valueOf(totalRowsChanged) + " students.");
+          p.sendMessage("Completed: " + String.join(", ", completedAndrewIDs));
+          p.sendMessage("Not completed: " + String.join(", ", notCompletedAndrewIDs));
         });
     ui.showToPlayer(p.getUniqueId(), 0);
   }
@@ -432,11 +413,11 @@ public class Main extends JavaPlugin {
       q.close();
       return;
     }
-    int assignmentID = q.getInt("id");
+    int assignmentIndex = q.getInt("id");
     q.close();
 
     // try to get details
-    q = db.queryDB("SELECT details FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;", assignmentID,
+    q = db.queryDB("SELECT details FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;", assignmentIndex,
         args[2]);
     if (!q.next()) {
       p.sendMessage("Student didn't submit this assignment!");
