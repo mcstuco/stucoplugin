@@ -12,11 +12,22 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 public class EventListener implements Listener {
 
   @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
   public void onPlayerJoin(PlayerJoinEvent event) {
+    // namespace can be found: https://minecraft.fandom.com/wiki/Advancement
+    Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft("story/mine_diamond"));
+    Main.updateAdvancement(Bukkit.getServer().getConsoleSender(), "hw3", adv);
+
+    adv = Bukkit.getAdvancement(NamespacedKey.minecraft("end/enter_end_gateway"));
+    Main.updateAdvancement(Bukkit.getServer().getConsoleSender(), "hw4", adv);
+  }
+
+  @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+  public void onPlayerQuit(PlayerQuitEvent event) {
     // namespace can be found: https://minecraft.fandom.com/wiki/Advancement
     Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft("story/mine_diamond"));
     Main.updateAdvancement(Bukkit.getServer().getConsoleSender(), "hw3", adv);
