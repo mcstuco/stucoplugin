@@ -115,7 +115,7 @@ public class VirtualUI {
     if (line.contains(": ")) {
       String[] split = line.split(": ", 1);
       if (split.length == 2) {
-        line = "&n&7" + split[0] + ": &r&7" + split[1];
+        line = "&n&7" + split[0] + ": &r&8" + split[1];
       } else {
         line = "&r&7" + line;
       }

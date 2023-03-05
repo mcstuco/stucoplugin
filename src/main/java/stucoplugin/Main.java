@@ -83,7 +83,7 @@ public class Main extends JavaPlugin {
       if (cmd.getName().equalsIgnoreCase("hw")) {
         // base command usage hint
         if (args.length == 0) {
-          sender.sendMessage("Usage: /hw [submit/list/advancement]");
+          sender.sendMessage("Usage: /hw [submit/list]");
           return true;
         }
 
@@ -201,7 +201,11 @@ public class Main extends JavaPlugin {
     p.sendMessage(sb.toString());
 
     VirtualUI ui = StudentUI.getHWUI(p, p);
-    ui.showToPlayer(p);
+    if (ui != null) {
+      ui.showToPlayer(p);
+    } else {
+      p.sendMessage("No UI to show");
+    }
   }
 
   private void hwadminList(Player p, String[] args) throws SQLException {
@@ -210,7 +214,11 @@ public class Main extends JavaPlugin {
       p.sendMessage("Usage: /hwadmin list [andrewID/IGN]");
 
       VirtualUI ui = StudentUI.getRosterUI();
-      ui.showToPlayer(p);
+      if (ui != null) {
+        ui.showToPlayer(p);
+      } else {
+        p.sendMessage("No UI to show");
+      }
       return;
     }
 
@@ -232,7 +240,11 @@ public class Main extends JavaPlugin {
     UUID playerUUID = UUID.fromString(uuid);
     OfflinePlayer player = Bukkit.getOfflinePlayer(playerUUID);
     VirtualUI ui = StudentUI.getHWUI(p, player);
-    ui.showToPlayer(p);
+    if (ui != null) {
+      ui.showToPlayer(p);
+    } else {
+      p.sendMessage("No UI to show");
+    }
   }
 
   // final command is /hwadmin grade [id] [studentid] [grade]
@@ -440,7 +452,11 @@ public class Main extends JavaPlugin {
     q.close();
 
     VirtualUI ui = StudentUI.getAdvancementUI(p, adv, assignmentIndex, args[1]);
-    ui.showToPlayer(p, 0);
+    if (ui != null) {
+      ui.showToPlayer(p);
+    } else {
+      p.sendMessage("No UI to show");
+    }
   }
 
   private void hwadminShow(Player p, String[] args) {

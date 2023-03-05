@@ -1,6 +1,8 @@
 package stucoplugin;
 
+import java.sql.Date;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -74,7 +76,7 @@ public class StudentUI {
     };
 
     ui.addLineBreak(1, Material.BLACK_STAINED_GLASS_PANE);
-    ui.addItemStack(-1, Material.GREEN_WOOL, "Confirm",
+    ui.addItemStack(-1, Material.GREEN_CONCRETE, "Confirm",
         Arrays.asList("update " + adv.toString() + " to " + hwName), false,
         VirtualUICallback.withConfirm("Refresh Advancement HW?", null, callback));
     return ui;
@@ -146,8 +148,9 @@ public class StudentUI {
     lore.add("Student Name: " + studentName);
     lore.add("UUID: " + uuid);
     lore.add("Discord: " + discord);
-    ui.addItemStack(-1, p.getUniqueId(), p.getName(), null, false, null);
-    ui.addLineBreak(1, Material.BLACK_STAINED_GLASS_PANE);
+
+    ui.addItemStack(-1, p.getUniqueId(), p.getName(), lore, false, null);
+    ui.addItemStack(-1, Material.GRAY_STAINED_GLASS_PANE, "", null, false, null);
 
     List<ItemStack> items = new ArrayList<ItemStack>();
     while (q.next()) {
@@ -226,12 +229,13 @@ public class StudentUI {
         itemName = itemName.substring(itemName.lastIndexOf(ChatColor.COLOR_CHAR) + 2);
       }
       String hwName = itemName;
-      
+
       String command = "hw submit " + hwName;
 
       // check if user can submit
-      q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ? AND userSubmittable = true;", hwName,
-      term);
+      q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ? AND userSubmittable = true;",
+          hwName,
+          term);
       if (!q.next()) {
         q.close();
         VirtualUICallback cb = (VirtualUI _ui, Player _player, ItemStack _item, int _slot, int _index) -> {
@@ -246,8 +250,68 @@ public class StudentUI {
         ui.addItemStack(-1, item, VirtualUICallback.withConfirm("Submit the Homework?", "/" + command, cb));
       }
     }
-
     q.close();
+
+    ui.addLineBreak(1, Material.GRAY_STAINED_GLASS_PANE);
+
+    // getting class session
+    q = db.queryDB("SELECT date, code, accepting FROM intro2mc_classsession WHERE term = ?;", term);
+    int totalClassSession = 0;
+    int totalAttended = 0;
+    int totalExcused = 0;
+    while (q.next()) {
+      totalClassSession++;
+      String date = q.getString("date");
+      // String code = q.getString("code");
+      Boolean accepting = q.getBoolean("accepting");
+      List<String> classSessionLore = new ArrayList<String>();
+      classSessionLore.add("Accepting Attendance: " + accepting + (accepting ? " (click to submit attendance)" : ""));
+
+      // getting attendance
+      DBConnect.Query qq = db.queryDB(
+          "SELECT created_at, updated_at, excused, reason FROM intro2mc_attendance WHERE student_id = ? AND term = ? AND classSession_id = ?;",
+          andrewID, term, date);
+      int count = 0;
+      Boolean isExcused = false;
+      if (qq.next()) {
+        count++;
+        Timestamp createdAt = qq.getTimestamp("created_at");
+        Timestamp updatedAt = qq.getTimestamp("updated_at");
+        Boolean excused = qq.getBoolean("excused");
+        isExcused = isExcused || excused;
+        String reason = qq.getString("reason");
+
+        classSessionLore.add("Attended: true");
+        classSessionLore.add("Attended At: " + createdAt);
+        classSessionLore.add("Is Excused: " + excused);
+        if (excused) {
+          classSessionLore.add("Excused Reason: " + reason);
+        }
+        classSessionLore.add("");
+      }
+      if (count == 0) {
+        classSessionLore.add("Attended: false");
+        classSessionLore.add("");
+      }
+      qq.close();
+      if (count != 0) {
+        totalAttended++;
+        if (isExcused) {
+          totalExcused++;
+        }
+      }
+
+      ui.addItemStack(-1, count == 0 ? Material.RED_CONCRETE : Material.GREEN_CONCRETE,
+          "Attendance: " + date.toString(), classSessionLore, accepting, null);
+    }
+    q.close();
+
+
+    // refresh lore
+    lore.add("Attendance: " + totalAttended + "/" + totalClassSession);
+    lore.add("Excused: " + totalExcused + "/" + totalAttended);
+    ui.addItemStack(0, p.getUniqueId(), p.getName(), lore, false, null);
+
     return ui;
   }
 }
