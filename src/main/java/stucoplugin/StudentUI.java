@@ -2,16 +2,119 @@ package stucoplugin;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.advancement.Advancement;
+import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import net.md_5.bungee.api.ChatColor;
+
 public class StudentUI {
+  public static VirtualUI getAdvancementUI(Player sender, Advancement adv, int assignmentIndex, String hwName)
+      throws SQLException {
+    DBConnect.Query q;
+    DBConnect db = Main.db;
+    String term = Main.term;
+
+    // List all student andrewID(varchar(200)) and uuid(varchar(200))
+    VirtualUI ui = new VirtualUI("Advancement for " + hwName, 54);
+    q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
+    ArrayList<String> andrewIDs = new ArrayList<String>();
+    ArrayList<Boolean> completeds = new ArrayList<Boolean>();
+    while (q.rs.next()) {
+      String andrewID = q.rs.getString("andrewID");
+      String uuid = q.rs.getString("uuid");
+      andrewIDs.add(andrewID);
+
+      // setting items in virtual inventory
+      OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(uuid));
+      Player player = offlinePlayer.getPlayer(); // Load the player's profile from disk
+      if (player == null) {
+        ui.addItemStack(-1, offlinePlayer.getUniqueId(), andrewID, Arrays.asList("Player Offline"), false, null);
+        completeds.add(false);
+      } else {
+        AdvancementProgress progress = player.getAdvancementProgress(adv);
+
+        Boolean completed = progress.isDone();
+        completeds.add(completed);
+        ArrayList<String> lore = new ArrayList<String>();
+        lore.add(adv.toString() + " " + (completed ? "completed" : "not completed"));
+        if (progress.getAwardedCriteria().size() == 0) {
+          lore.add("Awarded Criteria: (none)");
+        } else {
+          lore.add("Awarded Criteria:");
+          for (String criteria : progress.getAwardedCriteria()) {
+            lore.add(" - " + criteria);
+          }
+        }
+        if (progress.getRemainingCriteria().size() == 0) {
+          lore.add("Remaining Criteria: (none)");
+        } else {
+          lore.add("Remaining Criteria:");
+          for (String criteria : progress.getRemainingCriteria()) {
+            lore.add(" - " + criteria);
+          }
+        }
+        ui.addItemStack(-1, player.getUniqueId(), andrewID, lore, completed, null);
+      }
+    }
+    q.close();
+
+    VirtualUICallback callback = (VirtualUI callbackUI, Player player, ItemStack item, int slot, int index) -> {
+      Main.updateAdvancement(player, assignmentIndex, adv);
+    };
+
+    ui.addLineBreak(1, Material.BLACK_STAINED_GLASS_PANE);
+    ui.addItemStack(-1, Material.GREEN_WOOL, "Confirm",
+        Arrays.asList("update " + adv.toString() + " to " + hwName), false,
+        VirtualUICallback.withConfirm("Refresh Advancement HW?", null, callback));
+    return ui;
+  }
+
+  public static VirtualUI getRosterUI() throws SQLException {
+    DBConnect.Query q;
+    DBConnect db = Main.db;
+    String term = Main.term;
+
+    // List all student andrewID(varchar(200)) and uuid(varchar(200))
+    q = db.queryDB("SELECT andrewID, name, uuid, discord FROM intro2mc_student;");
+    VirtualUI ui = new VirtualUI("Student Roster (" + term + ")", 54);
+    while (q.rs.next()) {
+      String andrewID = q.rs.getString("andrewID");
+      String name = q.rs.getString("name");
+      String uuid = q.rs.getString("uuid");
+      String discord = q.rs.getString("discord");
+      UUID uu = UUID.fromString(uuid);
+      Boolean online = Bukkit.getOfflinePlayer(uu).isOnline();
+
+      List<String> lore = new ArrayList<String>();
+      lore.add("Player ID: " + Bukkit.getOfflinePlayer(uu).getName());
+      lore.add("Andrew ID: " + andrewID);
+      lore.add("Name: " + name);
+      lore.add("UUID: " + uuid);
+      lore.add("Discord: " + discord);
+      lore.add("Term: " + term);
+      lore.add("Online: " + online.toString());
+
+      VirtualUICallback callback = (VirtualUI callbackUI, Player player, ItemStack item, int slot, int index) -> {
+        player.performCommand("hwadmin list " + andrewID);
+      };
+
+      ui.addItemStack(-1, uu, name, lore, false, callback);
+    }
+    q.close();
+    return ui;
+  }
+
   public static VirtualUI getHWUI(Player sender, OfflinePlayer p) throws SQLException {
     DBConnect.Query q;
     DBConnect db = Main.db;
@@ -75,16 +178,16 @@ public class StudentUI {
         String gradeInterpretation = "Error";
         switch (grade) {
           case "U":
-            gradeInterpretation = "&fUNGRADED";
+            gradeInterpretation = "UNGRADED";
             break;
           case "P":
-            gradeInterpretation = "&aPASS";
+            gradeInterpretation = "PASS";
             break;
           case "R":
-            gradeInterpretation = "&4REDO";
+            gradeInterpretation = "REDO";
             break;
           default:
-            gradeInterpretation = "&cERROR";
+            gradeInterpretation = "ERROR";
             break;
         }
         String submissionTime = qq.getString("created_at");
@@ -118,7 +221,30 @@ public class StudentUI {
       return aName.compareTo(bName);
     });
     for (ItemStack item : items) {
-      ui.addItemStack(-1, item, null);
+      String itemName = item.getItemMeta().getDisplayName();
+      if (itemName.lastIndexOf(ChatColor.COLOR_CHAR) != -1) {
+        itemName = itemName.substring(itemName.lastIndexOf(ChatColor.COLOR_CHAR) + 2);
+      }
+      String hwName = itemName;
+      
+      String command = "hw submit " + hwName;
+
+      // check if user can submit
+      q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ? AND userSubmittable = true;", hwName,
+      term);
+      if (!q.next()) {
+        q.close();
+        VirtualUICallback cb = (VirtualUI _ui, Player _player, ItemStack _item, int _slot, int _index) -> {
+          _player.sendMessage("Assignment " + hwName + " is not submittable.");
+        };
+        ui.addItemStack(-1, item, cb);
+      } else {
+        // add callback
+        VirtualUICallback cb = (VirtualUI _ui, Player _player, ItemStack _item, int _slot, int _index) -> {
+          Bukkit.dispatchCommand(_player, command);
+        };
+        ui.addItemStack(-1, item, VirtualUICallback.withConfirm("Submit the Homework?", "/" + command, cb));
+      }
     }
 
     q.close();

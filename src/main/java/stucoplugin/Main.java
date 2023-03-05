@@ -50,7 +50,7 @@ public class Main extends JavaPlugin {
     // Load tab completer
     tabCompleter = new StucoTabCompleter(this);
     this.getCommand("hw").setTabCompleter(this.tabCompleter);
-    // this.getCommand("hwadmin").setTabCompleter(this.tabCompleter);
+    this.getCommand("hwadmin").setTabCompleter(this.tabCompleter);
 
     // Register events
     PluginManager pm = getServer().getPluginManager();
@@ -207,17 +207,24 @@ public class Main extends JavaPlugin {
   private void hwadminList(Player p, String[] args) throws SQLException {
     // check args length
     if (args.length != 2) {
-      p.sendMessage("Usage: /hwadmin list [andrewID]");
+      p.sendMessage("Usage: /hwadmin list [andrewID/IGN]");
+
+      VirtualUI ui = StudentUI.getRosterUI();
+      ui.showToPlayer(p);
       return;
     }
 
     // Check if student in system
-    String andrewID = args[1];
-    DBConnect.Query q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE andrewID = ?;", andrewID);
+    DBConnect.Query q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE andrewID = ?;", args[1]);
     if (!q.next()) {
-      p.sendMessage("Student " + andrewID + " does not exist.");
       q.close();
-      return;
+
+      q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE IGN = ?;", args[1]);
+      if (!q.next()) {
+        p.sendMessage("Student with IGN or andrewID " + args[1] + " does not exist.");
+        q.close();
+        return;
+      }
     }
     String uuid = q.getString("uuid");
     q.close();
@@ -330,6 +337,90 @@ public class Main extends JavaPlugin {
     }
   }
 
+  public static void updateAdvancement(CommandSender sender, int assignmentIndex, Advancement adv) {
+    ArrayList<String> andrewIDs = new ArrayList<String>();
+    ArrayList<Boolean> completeds = new ArrayList<Boolean>();
+    try {
+      DBConnect.Query q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
+
+      while (q.rs.next()) {
+        String andrewID = q.rs.getString("andrewID");
+        String uuid = q.rs.getString("uuid");
+        andrewIDs.add(andrewID);
+
+        // setting items in virtual inventory
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(uuid));
+        Player player = offlinePlayer.getPlayer(); // Load the player's profile from disk
+        if (player == null) {
+          completeds.add(false);
+        } else {
+          completeds.add(player.getAdvancementProgress(adv).isDone());
+        }
+      }
+    } catch (Exception e) {
+      sender.sendMessage("Error loading students.");
+      return;
+    }
+
+    int totalRowsChanged = 0;
+    long currentTime = System.currentTimeMillis();
+    ArrayList<String> completedAndrewIDs = new ArrayList<String>();
+    ArrayList<String> notCompletedAndrewIDs = new ArrayList<String>();
+
+    for (int i = 0; i < andrewIDs.size(); i++) {
+      String andrewID = andrewIDs.get(i);
+      Boolean completed = completeds.get(i);
+      if (completed) {
+        try {
+          completedAndrewIDs.add(andrewID);
+          DBConnect.Query qq;
+          // checking if row already exist
+          qq = db.queryDB("SELECT * FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;",
+              assignmentIndex, andrewID);
+          if (qq.rs.next()) {
+            qq.close();
+            sender.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
+            continue;
+          }
+          int rowschanged = db.updateDB("INSERT INTO intro2mc_submission " +
+              "(created_at, updated_at, assignment_id, student_id, details, grade) " +
+              "VALUES (?, ?, ?, ?, ?, \"P\");",
+              currentTime, currentTime, assignmentIndex, andrewID,
+              "automatically submitted by system)");
+          totalRowsChanged += rowschanged;
+        } catch (Exception e) {
+          sender.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
+        }
+      } else {
+        notCompletedAndrewIDs.add(andrewID);
+      }
+    }
+    sender.sendMessage("Grade successfully updated for " + String.valueOf(totalRowsChanged) + " students.");
+    sender.sendMessage("Completed: " + String.join(", ", completedAndrewIDs));
+    sender.sendMessage("Not completed: " + String.join(", ", notCompletedAndrewIDs));
+  }
+
+  public static void updateAdvancement(CommandSender sender, String hwName, Advancement adv) {
+    // Check if assignment in system
+    int assignmentIndex = -1;
+    try {
+
+      DBConnect.Query q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ?;", hwName, term);
+      if (!q.next()) {
+        sender.sendMessage("Assignment " + hwName + " does not exist.");
+        q.close();
+        return;
+      }
+      assignmentIndex = q.getInt("id");
+      q.close();
+    } catch (Exception e) {
+      sender.sendMessage("Error loading students.");
+      return;
+    }
+
+    updateAdvancement(sender, assignmentIndex, adv);
+  }
+
   private void hwAdvancement(Player p, String[] args) throws SQLException {
     if (args.length != 3) {
       p.sendMessage(
@@ -348,80 +439,8 @@ public class Main extends JavaPlugin {
     int assignmentIndex = q.getInt("id");
     q.close();
 
-    // List all student andrewID(varchar(200)) and uuid(varchar(200))
-    VirtualUI ui = new VirtualUI("Advancement for " + args[1], 54);
-    q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
-    ArrayList<String> andrewIDs = new ArrayList<String>();
-    ArrayList<Boolean> completeds = new ArrayList<Boolean>();
-    while (q.rs.next()) {
-      String andrewID = q.rs.getString("andrewID");
-      String uuid = q.rs.getString("uuid");
-      andrewIDs.add(andrewID);
-
-      // setting items in virtual inventory
-      OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(uuid));
-      Player player = offlinePlayer.getPlayer(); // Load the player's profile from disk
-      if (player == null) {
-        ui.addItemStack(-1, offlinePlayer.getUniqueId(), andrewID, Arrays.asList("Player Offline"), false, null);
-        completeds.add(false);
-      } else {
-        AdvancementProgress progress = player.getAdvancementProgress(adv);
-  
-        Boolean completed = progress.isDone();
-        completeds.add(completed);
-        ArrayList<String> lore = new ArrayList<String>();
-        lore.add(adv.toString() + " " + (completed ? "completed" : "not completed"));
-        if (progress.getAwardedCriteria().size() == 0) {
-          lore.add("Awarded Criteria: (none)");
-        } else {
-          lore.add("Awarded Criteria:");
-          for (String criteria : progress.getAwardedCriteria()) {
-            lore.add(" - " + criteria);
-          }
-        }
-        if (progress.getRemainingCriteria().size() == 0) {
-          lore.add("Remaining Criteria: (none)");
-        } else {
-          lore.add("Remaining Criteria:");
-          for (String criteria : progress.getRemainingCriteria()) {
-            lore.add(" - " + criteria);
-          }
-        }
-        ui.addItemStack(-1, player.getUniqueId(), andrewID, lore, completed, null);
-      }
-    }
-    q.close();
-    ui.addLineBreak(1, Material.BLACK_STAINED_GLASS_PANE);
-    ui.addItemStack(-1, Material.GREEN_WOOL, "Confirm",
-        Arrays.asList("update " + adv.toString() + " to HW" + args[1]), true,
-        (VirtualUI callbackUI, Player player, ItemStack item, int slot, int index) -> {
-          int totalRowsChanged = 0;
-          long currentTime = System.currentTimeMillis();
-          ArrayList<String> completedAndrewIDs = new ArrayList<String>();
-          ArrayList<String> notCompletedAndrewIDs = new ArrayList<String>();
-          for (int i = 0; i < andrewIDs.size(); i++) {
-            String andrewID = andrewIDs.get(i);
-            Boolean completed = completeds.get(i);
-            if (completed) {
-              try {
-                int rowschanged = db.updateDB("INSERT INTO intro2mc_submission " +
-                    "(created_at, updated_at, assignment_id, student_id, details, grade) " +
-                    "VALUES (?, ?, ?, ?, ?, \"P\");",
-                    currentTime, currentTime, assignmentIndex, andrewID, "automatically submitted by player " + player.getDisplayName() + " (" + player.getUniqueId() + ")");
-                totalRowsChanged += rowschanged;
-                completedAndrewIDs.add(andrewID);
-              } catch (Exception e) {
-                p.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
-              }
-            } else {
-              notCompletedAndrewIDs.add(andrewID);
-            }
-          }
-          p.sendMessage("Grade successfully updated for " + String.valueOf(totalRowsChanged) + " students.");
-          p.sendMessage("Completed: " + String.join(", ", completedAndrewIDs));
-          p.sendMessage("Not completed: " + String.join(", ", notCompletedAndrewIDs));
-        });
-    ui.showToPlayer(p.getUniqueId(), 0);
+    VirtualUI ui = StudentUI.getAdvancementUI(p, adv, assignmentIndex, args[1]);
+    ui.showToPlayer(p, 0);
   }
 
   private void hwadminShow(Player p, String[] args) {
@@ -446,7 +465,8 @@ public class Main extends JavaPlugin {
     q.close();
 
     // try to get details
-    q = db.queryDB("SELECT details FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;", assignmentIndex,
+    q = db.queryDB("SELECT details FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;",
+        assignmentIndex,
         args[2]);
     if (!q.next()) {
       p.sendMessage("Student didn't submit this assignment!");
