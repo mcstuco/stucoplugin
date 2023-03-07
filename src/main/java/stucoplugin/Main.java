@@ -140,7 +140,7 @@ public class Main extends JavaPlugin {
     String hwid = args[1];
 
     // Check if student in system
-    q = db.queryDB("SELECT andrewID FROM intro2mc_student WHERE IGN = ?;", p.getName());
+    q = db.queryDB("SELECT andrewID FROM intro2mc_student WHERE uuid = ?;", p.getUniqueId().toString());
     if (!q.next()) {
       p.sendMessage(
           "You are not registered for the system! Please contact the instructors if you believe this is a mistake.");
@@ -229,7 +229,7 @@ public class Main extends JavaPlugin {
 
       q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE IGN = ?;", args[1]);
       if (!q.next()) {
-        p.sendMessage("Student with IGN or andrewID " + args[1] + " does not exist.");
+        p.sendMessage("Student with IGN or andrewID " + args[1] + " does not exist or IGN does not match database record");
         q.close();
         return;
       }

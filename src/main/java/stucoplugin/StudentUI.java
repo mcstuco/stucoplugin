@@ -124,7 +124,7 @@ public class StudentUI {
 
     // START SHOWING VirtualUI
     // check if student in system
-    q = db.queryDB("SELECT andrewID, name, uuid, discord FROM intro2mc_student WHERE IGN = ?;", p.getName());
+    q = db.queryDB("SELECT andrewID, name, discord FROM intro2mc_student WHERE uuid = ?;", p.getUniqueId().toString());
     if (!q.next()) {
       sender.sendMessage(
           "The player " + p.getName()
@@ -134,7 +134,6 @@ public class StudentUI {
     }
     String andrewID = q.getString("andrewID");
     String studentName = q.getString("name");
-    String uuid = q.getString("uuid");
     String discord = q.getString("discord");
     q.close();
 
@@ -146,7 +145,7 @@ public class StudentUI {
     ArrayList<String> lore = new ArrayList<String>();
     lore.add("Andrew ID: " + andrewID);
     lore.add("Student Name: " + studentName);
-    lore.add("UUID: " + uuid);
+    lore.add("UUID: " + p.getUniqueId());
     lore.add("Discord: " + discord);
 
     ui.addItemStack(-1, p.getUniqueId(), p.getName(), lore, false, null);
