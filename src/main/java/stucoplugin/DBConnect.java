@@ -88,6 +88,9 @@ public class DBConnect {
 
     public int getInt(String name) throws SQLException {return rs.getInt(name);}
     public String getString(String name) throws SQLException {return rs.getString(name);}
+    public boolean getBoolean(String name) throws SQLException {return rs.getBoolean(name);}
+    public Timestamp getTimestamp(String name) throws SQLException {return rs.getTimestamp(name);}
+    public String getTime(String name) throws SQLException {return rs.getTime(name).toString();}
 
     public void close() throws SQLException {
       if (rs != null) rs.close();
