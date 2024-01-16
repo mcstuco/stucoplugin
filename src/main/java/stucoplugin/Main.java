@@ -2,21 +2,18 @@ package stucoplugin;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.advancement.Advancement;
-import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -42,7 +39,7 @@ public class Main extends JavaPlugin {
     // Connect to database
     try {
       db = new DBConnect(path);
-    } catch (Exception e) {
+    } catch (IllegalArgumentException e) {
       this.getLogger().severe("Failed to connect to database! System will be disabled.");
       this.numfails = 0;
     }
@@ -79,7 +76,6 @@ public class Main extends JavaPlugin {
     }
 
     try {
-
       if (cmd.getName().equalsIgnoreCase("hw")) {
         // base command usage hint
         if (args.length == 0) {
@@ -106,8 +102,6 @@ public class Main extends JavaPlugin {
         // process commands
         if (args[0].equalsIgnoreCase("grade")) {
           hwadminGrade((Player) sender, args);
-        } else if (args[0].equalsIgnoreCase("show")) {
-          hwadminShow((Player) sender, args);
         } else if (args[0].equalsIgnoreCase("tp")) {
           hwadminTp((Player) sender, args);
         } else if (args[0].equalsIgnoreCase("advancement")) {
@@ -118,7 +112,6 @@ public class Main extends JavaPlugin {
           sender.sendMessage("Usage: /hwadmin [grade/show/tp/advancement/list]");
         }
       }
-
     } catch (Exception e) {
       numfails--;
       sender.sendMessage("An error occurred while processing your command. Please contact an instructor.");
@@ -227,12 +220,14 @@ public class Main extends JavaPlugin {
     if (!q.next()) {
       q.close();
 
-      q = db.queryDB("SELECT uuid FROM intro2mc_student WHERE IGN = ?;", args[1]);
-      if (!q.next()) {
-        p.sendMessage("Student with IGN or andrewID " + args[1] + " does not exist or IGN does not match database record");
-        q.close();
+      DBConnect.Query qq = db.queryDB("SELECT uuid FROM intro2mc_student WHERE IGN = ?;", args[1]);
+      if (!qq.next()) {
+        p.sendMessage(
+            "Student with IGN or andrewID " + args[1] + " does not exist or IGN does not match database record");
+        qq.close();
         return;
       }
+      qq.close();
     }
     String uuid = q.getString("uuid");
     q.close();
@@ -292,7 +287,7 @@ public class Main extends JavaPlugin {
           Location loc = temp.getLocation("location");
           cb.append("(tp)").color(ChatColor.AQUA)
               .event(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/hwadmin tp " + hwid + " " + studentID));
-        } catch (Exception e) {
+        } catch (InvalidConfigurationException e) {
         }
         // separator
         cb.append("................").color(ChatColor.DARK_GRAY);
@@ -349,30 +344,27 @@ public class Main extends JavaPlugin {
     }
   }
 
-  public static void updateAdvancement(CommandSender sender, int assignmentIndex, Advancement adv) {
+  public static void updateAdvancement(CommandSender sender, int assignmentIndex, Advancement adv) throws SQLException {
     ArrayList<String> andrewIDs = new ArrayList<String>();
     ArrayList<Boolean> completeds = new ArrayList<Boolean>();
-    try {
-      DBConnect.Query q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
 
-      while (q.rs.next()) {
-        String andrewID = q.rs.getString("andrewID");
-        String uuid = q.rs.getString("uuid");
-        andrewIDs.add(andrewID);
+    DBConnect.Query q = db.queryDB("SELECT andrewID, uuid FROM intro2mc_student;");
 
-        // setting items in virtual inventory
-        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(uuid));
-        Player player = offlinePlayer.getPlayer(); // Load the player's profile from disk
-        if (player == null) {
-          completeds.add(false);
-        } else {
-          completeds.add(player.getAdvancementProgress(adv).isDone());
-        }
+    while (q.rs.next()) {
+      String andrewID = q.rs.getString("andrewID");
+      String uuid = q.rs.getString("uuid");
+      andrewIDs.add(andrewID);
+
+      // setting items in virtual inventory
+      OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(UUID.fromString(uuid));
+      Player player = offlinePlayer.getPlayer(); // Load the player's profile from disk
+      if (player == null) {
+        completeds.add(false);
+      } else {
+        completeds.add(player.getAdvancementProgress(adv).isDone());
       }
-    } catch (Exception e) {
-      sender.sendMessage("Error loading students.");
-      return;
     }
+    q.close();
 
     int totalRowsChanged = 0;
     long currentTime = System.currentTimeMillis();
@@ -383,26 +375,22 @@ public class Main extends JavaPlugin {
       String andrewID = andrewIDs.get(i);
       Boolean completed = completeds.get(i);
       if (completed) {
-        try {
-          completedAndrewIDs.add(andrewID);
-          DBConnect.Query qq;
-          // checking if row already exist
-          qq = db.queryDB("SELECT * FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;",
-              assignmentIndex, andrewID);
-          if (qq.rs.next()) {
-            qq.close();
-            sender.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
-            continue;
-          }
-          int rowschanged = db.updateDB("INSERT INTO intro2mc_submission " +
-              "(created_at, updated_at, assignment_id, student_id, details, grade) " +
-              "VALUES (?, ?, ?, ?, ?, \"P\");",
-              currentTime, currentTime, assignmentIndex, andrewID,
-              "automatically submitted by system)");
-          totalRowsChanged += rowschanged;
-        } catch (Exception e) {
+        completedAndrewIDs.add(andrewID);
+        DBConnect.Query qq = db.queryDB(
+            "SELECT * FROM intro2mc_submission WHERE assignment_id = ? AND student_id = ?;",
+            assignmentIndex, andrewID);
+        if (qq.rs.next()) {
+          qq.close();
           sender.sendMessage("Error updating grade for " + andrewID + ". Maybe they already submitted?");
+          continue;
         }
+        int rowschanged = db.updateDB("INSERT INTO intro2mc_submission " +
+            "(created_at, updated_at, assignment_id, student_id, details, grade) " +
+            "VALUES (?, ?, ?, ?, ?, \"P\");",
+            currentTime, currentTime, assignmentIndex, andrewID,
+            "automatically submitted by system)");
+        qq.close();
+        totalRowsChanged += rowschanged;
       } else {
         notCompletedAndrewIDs.add(andrewID);
       }
@@ -412,23 +400,18 @@ public class Main extends JavaPlugin {
     sender.sendMessage("Not completed: " + String.join(", ", notCompletedAndrewIDs));
   }
 
-  public static void updateAdvancement(CommandSender sender, String hwName, Advancement adv) {
+  public static void updateAdvancement(CommandSender sender, String hwName, Advancement adv) throws SQLException {
     // Check if assignment in system
     int assignmentIndex = -1;
-    try {
 
-      DBConnect.Query q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ?;", hwName, term);
-      if (!q.next()) {
-        sender.sendMessage("Assignment " + hwName + " does not exist.");
-        q.close();
-        return;
-      }
-      assignmentIndex = q.getInt("id");
+    DBConnect.Query q = db.queryDB("SELECT id FROM intro2mc_assignment WHERE name = ? AND term = ?;", hwName, term);
+    if (!q.next()) {
+      sender.sendMessage("Assignment " + hwName + " does not exist.");
       q.close();
-    } catch (Exception e) {
-      sender.sendMessage("Error loading students.");
       return;
     }
+    assignmentIndex = q.getInt("id");
+    q.close();
 
     updateAdvancement(sender, assignmentIndex, adv);
   }
@@ -457,9 +440,6 @@ public class Main extends JavaPlugin {
     } else {
       p.sendMessage("No UI to show");
     }
-  }
-
-  private void hwadminShow(Player p, String[] args) {
   }
 
   private void hwadminTp(Player p, String[] args) throws SQLException {
@@ -498,7 +478,7 @@ public class Main extends JavaPlugin {
       temp.loadFromString(details);
       Location loc = temp.getLocation("location");
       p.teleport(loc);
-    } catch (Exception e) {
+    } catch (InvalidConfigurationException e) {
       p.sendMessage("This submission/assignment is not a teleportable location!");
     }
   }

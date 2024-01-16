@@ -1,6 +1,5 @@
 package stucoplugin;
 
-import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -216,6 +215,7 @@ public class StudentUI {
         items.add(ui.getItemStack(Material.PAPER, assignmentName, assignmentLore, gradeReleased));
       }
     }
+    q.close();
 
     items.sort((a, b) -> {
       String aName = a.getItemMeta().getDisplayName();
@@ -236,7 +236,6 @@ public class StudentUI {
           hwName,
           term);
       if (!q.next()) {
-        q.close();
         VirtualUICallback cb = (VirtualUI _ui, Player _player, ItemStack _item, int _slot, int _index) -> {
           _player.sendMessage("Assignment " + hwName + " is not submittable.");
         };
@@ -248,8 +247,8 @@ public class StudentUI {
         };
         ui.addItemStack(-1, item, VirtualUICallback.withConfirm("Submit the Homework?", "/" + command, cb));
       }
+      q.close();
     }
-    q.close();
 
     ui.addLineBreak(1, Material.GRAY_STAINED_GLASS_PANE);
 
@@ -288,11 +287,11 @@ public class StudentUI {
         }
         classSessionLore.add("");
       }
+      qq.close();
       if (count == 0) {
         classSessionLore.add("Attended: false");
         classSessionLore.add("");
       }
-      qq.close();
       if (count != 0) {
         totalAttended++;
         if (isExcused) {

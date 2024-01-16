@@ -1,5 +1,6 @@
 package stucoplugin;
 
+import java.sql.SQLException;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
@@ -17,7 +18,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 public class EventListener implements Listener {
 
   @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-  public void onPlayerJoin(PlayerJoinEvent event) {
+  public void onPlayerJoin(PlayerJoinEvent event) throws SQLException {
     // namespace can be found: https://minecraft.fandom.com/wiki/Advancement
     Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft("story/mine_diamond"));
     Main.updateAdvancement(Bukkit.getServer().getConsoleSender(), "hw3", adv);
@@ -27,7 +28,7 @@ public class EventListener implements Listener {
   }
 
   @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-  public void onPlayerQuit(PlayerQuitEvent event) {
+  public void onPlayerQuit(PlayerQuitEvent event) throws SQLException {
     // namespace can be found: https://minecraft.fandom.com/wiki/Advancement
     Advancement adv = Bukkit.getAdvancement(NamespacedKey.minecraft("story/mine_diamond"));
     Main.updateAdvancement(Bukkit.getServer().getConsoleSender(), "hw3", adv);
@@ -37,7 +38,7 @@ public class EventListener implements Listener {
   }
 
   @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-  public void onInventoryClick(InventoryClickEvent event) {
+  public void onInventoryClick(InventoryClickEvent event) throws SQLException {
     int size = event.getInventory().getSize();
     if (size < 18) {
       return;

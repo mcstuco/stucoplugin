@@ -1,5 +1,6 @@
 package stucoplugin;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +19,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 
 @FunctionalInterface
 interface VirtualUICallback {
-  void call(VirtualUI ui, Player player, ItemStack item, int slot, int index);
+  void call(VirtualUI ui, Player player, ItemStack item, int slot, int index) throws SQLException;
 
   public static VirtualUICallback withConfirm(String name, String message, VirtualUICallback callback) {
     VirtualUICallback callbackWrapper = (_ui, _player, _item, _slot, _index) -> {

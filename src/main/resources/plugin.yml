@@ -1,7 +1,7 @@
 name: stucoplugin
 main: stucoplugin.Main
-version: 1.18.1.0
-api-version: 1.18
+version: 1.20.2.0
+api-version: 1.20
 commands:
   hw:
     description: Stuco HW submission system
