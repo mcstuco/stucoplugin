@@ -40,7 +40,7 @@ public class Main extends JavaPlugin {
     try {
       db = new DBConnect(path);
     } catch (IllegalArgumentException e) {
-      this.getLogger().severe("Failed to connect to database! System will be disabled.");
+      this.getLogger().severe("Failed to connect to database at " + path + "! System will be disabled.");
       this.numfails = 0;
     }
 
